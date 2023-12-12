@@ -1,0 +1,17 @@
+# MacOS metadata
+**/.DS_Store
+
+# PyCharm project files
+.idea
+
+# Pycache
+__pycache__
+
+# Python package egg folder
+*egg-info
+
+# Python virtual environment
+venv
+
+# Jupyter-lab files
+**/.ipynb_checkpoints

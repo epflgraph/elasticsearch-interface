@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "elasticsearch-interface"
+version = "0.1.0"
+authors = [
+  { name="Aitor Pérez", email="aitor.perez@epfl.ch" }
+]
+description = "Interface to interact with elasticsearch's python client for the use case of EPFL Graph"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "pandas",
+    "elasticsearch"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/epflgraph/elasticsearch-interface"
+"Source code" = "https://github.com/epflgraph/elasticsearch-interface"
+"Documentation" = "https://github.com/epflgraph/elasticsearch-interface"
+"Bug Tracker" = "https://github.com/epflgraph/elasticsearch-interface/issues"
