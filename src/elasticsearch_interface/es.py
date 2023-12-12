@@ -1,6 +1,5 @@
 from ssl import create_default_context
 
-import pandas as pd
 from elasticsearch import Elasticsearch
 
 from elasticsearch_interface.utils import (
@@ -55,8 +54,7 @@ class ES:
             limit (int): Maximum number of returned results.
 
         Returns:
-            pd.DataFrame: A pandas DataFrame with columns ['PageID', 'PageTitle', 'Searchrank', 'SearchScore'],
-            unique in 'PageID', with the wikisearch results the given keywords set.
+            list: A list of the documents that are hits for the search.
         """
 
         query = es_bool(
@@ -101,8 +99,7 @@ class ES:
             limit (int): Maximum number of returned results.
 
         Returns:
-            pd.DataFrame: A pandas DataFrame with columns ['PageID', 'PageTitle', 'Searchrank', 'SearchScore'],
-            unique in 'PageID', with the wikisearch results the given keywords set.
+            list: A list of the documents that are hits for the search.
         """
 
         query = es_bool(
@@ -143,8 +140,7 @@ class ES:
             limit (int): Maximum number of returned results.
 
         Returns:
-            pd.DataFrame: A pandas DataFrame with columns ['PageID', 'PageTitle', 'Searchrank', 'SearchScore'],
-            unique in 'PageID', with the wikisearch results the given keywords set.
+            list: A list of the documents that are hits for the search.
         """
 
         query = es_bool(
@@ -186,8 +182,7 @@ class ES:
             limit (int): Maximum number of returned results.
 
         Returns:
-            pd.DataFrame: A pandas DataFrame with columns ['PageID', 'PageTitle', 'Searchrank', 'SearchScore'],
-            unique in 'PageID', with the wikisearch results the given keywords set.
+            list: A list of the documents that are hits for the search.
         """
 
         query = es_bool(
@@ -224,8 +219,7 @@ class ES:
             limit (int): Maximum number of returned results.
 
         Returns:
-            pd.DataFrame: A pandas DataFrame with columns ['PageID', 'PageTitle', 'Searchrank', 'SearchScore'],
-            unique in 'PageID', with the wikisearch results the given keywords set.
+            list: A list of the documents that are hits for the search.
         """
 
         return self._search_mediawiki(text, limit=limit)

@@ -10,6 +10,9 @@ __pycache__
 # Python package egg folder
 *egg-info
 
+# Python distribution folder
+dist
+
 # Python virtual environment
 venv
 
