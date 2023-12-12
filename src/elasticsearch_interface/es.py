@@ -18,7 +18,6 @@ class ES:
 
     def __init__(self, config, index):
         try:
-            print("Reading elasticsearch configuration from config parameter")
             self.host = config['host']
             self.port = config['port']
             self.username = config['username']
