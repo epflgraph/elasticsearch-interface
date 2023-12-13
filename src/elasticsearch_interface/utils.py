@@ -1,4 +1,4 @@
-def es_bool(must=None, must_not=None, should=None, filter=None):
+def bool_query(must=None, must_not=None, should=None, filter=None):
     """
     Build elasticsearch bool clause with given arguments.
 
@@ -25,7 +25,7 @@ def es_bool(must=None, must_not=None, should=None, filter=None):
     return query
 
 
-def es_match(field, text, boost=None, operator=None):
+def match_query(field, text, boost=None, operator=None):
     """
     Build elasticsearch match clause with given arguments.
 
@@ -50,7 +50,7 @@ def es_match(field, text, boost=None, operator=None):
     return query
 
 
-def es_multi_match(fields, text, type=None, boost=None, minimum_should_match=None, operator=None):
+def multi_match_query(fields, text, type=None, boost=None, minimum_should_match=None, operator=None):
     """
     Build elasticsearch multi_match clause with given arguments.
 
@@ -80,7 +80,7 @@ def es_multi_match(fields, text, type=None, boost=None, minimum_should_match=Non
     return query
 
 
-def es_dis_max(queries):
+def dis_max_query(queries):
     """
     Build elasticsearch dis_max clause with given arguments.
 
@@ -95,3 +95,34 @@ def es_dis_max(queries):
     }
 
     return query
+
+
+SCORE_FUNCTIONS = [
+    {
+        "field_value_factor": {"field": "DegreeScore"}
+    },
+    {
+        "filter": {"term": {"NodeType.keyword": "Concept"}},
+        "weight": 512
+    },
+    {
+        "filter": {"term": {"NodeType.keyword": "Person"}},
+        "weight": 128
+    },
+    {
+        "filter": {"term": {"NodeType.keyword": "Course"}},
+        "weight": 128
+    },
+    {
+        "filter": {"term": {"NodeType.keyword": "Unit"}},
+        "weight": 64
+    },
+    {
+        "filter": {"term": {"NodeType.keyword": "MOOC"}},
+        "weight": 64
+    },
+    {
+        "filter": {"term": {"NodeType.keyword": "Publication"}},
+        "weight": 1
+    }
+]

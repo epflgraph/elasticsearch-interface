@@ -3,10 +3,11 @@ from ssl import create_default_context
 from elasticsearch import Elasticsearch
 
 from elasticsearch_interface.utils import (
-    es_bool,
-    es_match,
-    es_multi_match,
-    es_dis_max,
+    bool_query,
+    match_query,
+    multi_match_query,
+    dis_max_query,
+    SCORE_FUNCTIONS,
 )
 
 
@@ -17,16 +18,10 @@ class ES:
 
     def __init__(self, config, index):
         try:
-            self.host = config['host']
-            self.port = config['port']
-            self.username = config['username']
-            self.cafile = config['cafile']
-            password = config['password']
-
-            context = create_default_context(cafile=self.cafile)
             self.client = Elasticsearch(
-                hosts=[f'https://{self.username}:{password}@{self.host}:{self.port}'],
-                ssl_context=context,
+                hosts=[f"https://{config['host']}:{config['port']}"],
+                basic_auth=(config['username'], config['password']),
+                ssl_context=create_default_context(cafile=config['cafile']),
                 request_timeout=3600
             )
         except (KeyError, FileNotFoundError):
@@ -57,31 +52,31 @@ class ES:
             list: A list of the documents that are hits for the search.
         """
 
-        query = es_bool(
+        query = bool_query(
             should=[
-                es_multi_match(fields=['all_near_match^10', 'all_near_match_asciifolding^7.5'], text=text),
-                es_bool(
+                multi_match_query(fields=['all_near_match^10', 'all_near_match_asciifolding^7.5'], text=text),
+                bool_query(
                     filter=[
-                        es_bool(
+                        bool_query(
                             should=[
-                                es_match('all', text=text, operator='and'),
-                                es_match('all.plain', text=text, operator='and')
+                                match_query('all', text=text, operator='and'),
+                                match_query('all.plain', text=text, operator='and')
                             ]
                         )
                     ],
                     should=[
-                        es_multi_match(fields=['title^3', 'title.plain^1'], text=text, type='most_fields', boost=0.3, minimum_should_match=1),
-                        es_multi_match(fields=['category^3', 'category.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
-                        es_multi_match(fields=['heading^3', 'heading.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
-                        es_multi_match(fields=['auxiliary_text^3', 'auxiliary_text.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
-                        es_multi_match(fields=['file_text^3', 'file_text.plain^1'], text=text, type='most_fields', boost=0.5, minimum_should_match=1),
-                        es_dis_max([
-                            es_multi_match(fields=['redirect^3', 'redirect.plain^1'], text=text, type='most_fields', boost=0.27, minimum_should_match=1),
-                            es_multi_match(fields=['suggest'], text=text, type='most_fields', boost=0.2, minimum_should_match=1)
+                        multi_match_query(fields=['title^3', 'title.plain^1'], text=text, type='most_fields', boost=0.3, minimum_should_match=1),
+                        multi_match_query(fields=['category^3', 'category.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
+                        multi_match_query(fields=['heading^3', 'heading.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
+                        multi_match_query(fields=['auxiliary_text^3', 'auxiliary_text.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
+                        multi_match_query(fields=['file_text^3', 'file_text.plain^1'], text=text, type='most_fields', boost=0.5, minimum_should_match=1),
+                        dis_max_query([
+                            multi_match_query(fields=['redirect^3', 'redirect.plain^1'], text=text, type='most_fields', boost=0.27, minimum_should_match=1),
+                            multi_match_query(fields=['suggest'], text=text, type='most_fields', boost=0.2, minimum_should_match=1)
                         ]),
-                        es_dis_max([
-                            es_multi_match(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1),
-                            es_multi_match(fields=['opening_text^3', 'opening_text.plain^1'], text=text, type='most_fields', boost=0.5, minimum_should_match=1)
+                        dis_max_query([
+                            multi_match_query(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1),
+                            multi_match_query(fields=['opening_text^3', 'opening_text.plain^1'], text=text, type='most_fields', boost=0.5, minimum_should_match=1)
                         ]),
                     ]
                 )
@@ -102,26 +97,26 @@ class ES:
             list: A list of the documents that are hits for the search.
         """
 
-        query = es_bool(
+        query = bool_query(
             should=[
-                es_match(field='all_near_match', text=text, boost=10),
-                es_bool(
+                match_query(field='all_near_match', text=text, boost=10),
+                bool_query(
                     filter=[
-                        es_match('all', text=text, operator='and')
+                        match_query('all', text=text, operator='and')
                     ],
                     should=[
-                        es_match(field='title', text=text, boost=0.9),
-                        es_match(field='category', text=text, boost=0.15),
-                        es_match(field='heading', text=text, boost=0.15),
-                        es_match(field='auxiliary_text', text=text, boost=0.15),
-                        es_match(field='file_text', text=text, boost=1.5),
-                        es_dis_max([
-                            es_match(field='redirect', text=text, boost=0.81),
-                            es_match(field='suggest', text=text, boost=0.2)
+                        match_query(field='title', text=text, boost=0.9),
+                        match_query(field='category', text=text, boost=0.15),
+                        match_query(field='heading', text=text, boost=0.15),
+                        match_query(field='auxiliary_text', text=text, boost=0.15),
+                        match_query(field='file_text', text=text, boost=1.5),
+                        dis_max_query([
+                            match_query(field='redirect', text=text, boost=0.81),
+                            match_query(field='suggest', text=text, boost=0.2)
                         ]),
-                        es_dis_max([
-                            es_match(field='text', text=text, boost=1.8),
-                            es_match(field='opening_text', text=text, boost=1.5)
+                        dis_max_query([
+                            match_query(field='text', text=text, boost=1.8),
+                            match_query(field='opening_text', text=text, boost=1.5)
                         ])
                     ]
                 )
@@ -143,27 +138,27 @@ class ES:
             list: A list of the documents that are hits for the search.
         """
 
-        query = es_bool(
+        query = bool_query(
             should=[
-                es_bool(
+                bool_query(
                     filter=[
-                        es_bool(
+                        bool_query(
                             should=[
-                                es_match('title', text=text, operator='and'),
-                                es_match('title.plain', text=text, operator='and'),
-                                es_match('text', text=text, operator='and'),
-                                es_match('text.plain', text=text, operator='and'),
-                                es_match('heading', text=text, operator='and'),
-                                es_match('heading.plain', text=text, operator='and')
+                                match_query('title', text=text, operator='and'),
+                                match_query('title.plain', text=text, operator='and'),
+                                match_query('text', text=text, operator='and'),
+                                match_query('text.plain', text=text, operator='and'),
+                                match_query('heading', text=text, operator='and'),
+                                match_query('heading.plain', text=text, operator='and')
                             ]
                         )
                     ],
                     should=[
-                        es_multi_match(fields=['title^3', 'title.plain^1'], text=text, type='most_fields', boost=0.3, minimum_should_match=1),
-                        es_multi_match(fields=['heading^3', 'heading.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
-                        es_dis_max([
-                            es_multi_match(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1),
-                            es_multi_match(fields=['opening_text^3', 'opening_text.plain^1'], text=text, type='most_fields', boost=0.5, minimum_should_match=1)
+                        multi_match_query(fields=['title^3', 'title.plain^1'], text=text, type='most_fields', boost=0.3, minimum_should_match=1),
+                        multi_match_query(fields=['heading^3', 'heading.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
+                        dis_max_query([
+                            multi_match_query(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1),
+                            multi_match_query(fields=['opening_text^3', 'opening_text.plain^1'], text=text, type='most_fields', boost=0.5, minimum_should_match=1)
                         ])
                     ]
                 )
@@ -185,30 +180,28 @@ class ES:
             list: A list of the documents that are hits for the search.
         """
 
-        query = es_bool(
+        query = bool_query(
             should=[
-                es_bool(
+                bool_query(
                     filter=[
-                        es_bool(
+                        bool_query(
                             should=[
-                                es_match('title', text=text, operator='and'),
-                                es_match('title.plain', text=text, operator='and'),
-                                es_match('text', text=text, operator='and'),
-                                es_match('text.plain', text=text, operator='and')
+                                match_query('title', text=text, operator='and'),
+                                match_query('title.plain', text=text, operator='and'),
+                                match_query('text', text=text, operator='and'),
+                                match_query('text.plain', text=text, operator='and')
                             ]
                         )
                     ],
                     should=[
-                        es_multi_match(fields=['title^3', 'title.plain^1'], text=text, type='most_fields', boost=0.3, minimum_should_match=1),
-                        es_multi_match(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1)
+                        multi_match_query(fields=['title^3', 'title.plain^1'], text=text, type='most_fields', boost=0.3, minimum_should_match=1),
+                        multi_match_query(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1)
                     ]
                 )
             ]
         )
 
         return self._search(query, limit=limit)
-
-    ################################################################
 
     def search(self, text, limit=10):
         """
@@ -223,6 +216,119 @@ class ES:
         """
 
         return self._search_mediawiki(text, limit=limit)
+
+    ################################################################
+
+    def get_nodeset(self, ids, node_type):
+        """Returns nodes based on exact match on the NodeKey field."""
+
+        split_size = 1000
+
+        # Split in two if too many ids
+        n = len(ids)
+        if n > split_size:
+            first_nodeset = self.get_nodeset(ids[: n // 2], node_type)
+            last_nodeset = self.get_nodeset(ids[n // 2:], node_type)
+            return first_nodeset + last_nodeset
+
+        # Fetch nodes from elasticsearch with the given ids
+        query = {
+            "bool": {
+                "filter": [
+                    {"term": {"NodeType.keyword": node_type}},
+                    {"terms": {"NodeKey.keyword": ids}}
+                ]
+            }
+        }
+        hits = self._search(query, limit=split_size, source=['NodeKey', 'NodeType', 'Title'])
+        nodeset = [hit['_source'] for hit in hits]
+
+        # Keep original order
+        nodeset = sorted(nodeset, key=lambda node: ids.index(node['NodeKey']))
+
+        return nodeset
+
+    def search_nodes(self, text, node_type):
+        """Returns nodes based on a full-text match on the Title field."""
+        query = {
+            "function_score": {
+                "score_mode": "multiply",
+                "functions": SCORE_FUNCTIONS,
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {
+                                "term": {"NodeType.keyword": node_type}
+                            }
+                        ],
+                        "must": [
+                            {
+                                "multi_match": {
+                                    "type": "most_fields",
+                                    "operator": "and",
+                                    "fields": ["NodeKey", "Title", "Title.raw", "Title.trigram"],
+                                    "query": text
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        # Try to match only Title field
+        hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'])
+        nodeset = [hit['_source'] for hit in hits]
+
+        # Fallback try to match Content field instead
+        if not nodeset:
+            query['function_score']['query']['bool']['must'][0]['multi_match']['fields'] = ['Content']
+            hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'])
+            nodeset = [hit['_source'] for hit in hits]
+
+        return nodeset
+
+    def search_node_contents(self, text, node_type, filter_ids=None):
+        """Returns nodes based on a full-text match on the Content field."""
+
+        query = {
+            "function_score": {
+                "score_mode": "multiply",
+                "functions": SCORE_FUNCTIONS,
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {
+                                "term": {"NodeType.keyword": node_type}
+                            }
+                        ],
+                        "must": [
+                            {
+                                "match": {
+                                    "Content": text
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        if filter_ids is not None:
+            query['function_score']['query']['bool']['filter'].append({"terms": {"NodeKey.keyword": filter_ids}})
+
+        hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'])
+
+        if not hits:
+            return []
+
+        # Return only results with a score higher than half of max_score
+        max_score = max([hit['_score'] for hit in hits])
+        nodeset = [hit['_source'] for hit in hits if hit['_score'] > 0.5 * max_score]
+
+        return nodeset
+
+    ################################################################
 
     def indices(self):
         """
