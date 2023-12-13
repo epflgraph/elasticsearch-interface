@@ -29,7 +29,7 @@ class ES:
                 ssl_context=context,
                 request_timeout=3600
             )
-        except KeyError:
+        except (KeyError, FileNotFoundError):
             print(
                 "The elasticsearch configuration that was provided is not valid. "
                 "Please make sure to provide a dict with the following keys: host, port, username, cafile, password."
