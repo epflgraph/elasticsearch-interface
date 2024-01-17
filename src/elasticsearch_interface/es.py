@@ -296,7 +296,7 @@ class ES:
 
         return nodeset
 
-    def search_node_contents(self, text, node_type, filter_ids=None):
+    def search_node_contents(self, text, node_type, n=10, return_scores=False, filter_ids=None):
         """Returns nodes based on a full-text match on the Content field."""
 
         query = {
@@ -325,14 +325,19 @@ class ES:
         if filter_ids is not None:
             query['function_score']['query']['bool']['filter'].append({"terms": {"NodeKey.keyword": filter_ids}})
 
-        hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'])
+        hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'], limit=n)
 
         if not hits:
             return []
 
         # Return only results with a score higher than half of max_score
         max_score = max([hit['_score'] for hit in hits])
-        nodeset = [hit['_source'] for hit in hits if hit['_score'] > 0.5 * max_score]
+        hits = [hit for hit in hits if hit['_score'] > 0.5 * max_score]
+
+        if return_scores:
+            nodeset = [{**hit['_source'], 'Score': hit['_score']} for hit in hits]
+        else:
+            nodeset = [hit['_source'] for hit in hits]
 
         return nodeset
 
