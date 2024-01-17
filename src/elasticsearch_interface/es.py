@@ -279,7 +279,7 @@ class ES:
         # Try to match only Title field
         hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'], limit=n)
         if return_scores:
-            nodeset = [{**hit['_source'], 'Score': hit['score']} for hit in hits]
+            nodeset = [{**hit['_source'], 'Score': hit['_score']} for hit in hits]
         else:
             nodeset = [hit['_source'] for hit in hits]
 
@@ -290,7 +290,7 @@ class ES:
         query['function_score']['query']['bool']['must'][0]['multi_match']['fields'] = ['Content']
         hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'], limit=n)
         if return_scores:
-            nodeset = [{**hit['_source'], 'Score': hit['score']} for hit in hits]
+            nodeset = [{**hit['_source'], 'Score': hit['_score']} for hit in hits]
         else:
             nodeset = [hit['_source'] for hit in hits]
 
