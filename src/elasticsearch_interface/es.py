@@ -248,7 +248,7 @@ class ES:
 
         return nodeset
 
-    def search_nodes(self, text, node_type):
+    def search_nodes(self, text, node_type, n=10, return_scores=False):
         """Returns nodes based on a full-text match on the Title field."""
         query = {
             "function_score": {
@@ -277,13 +277,21 @@ class ES:
         }
 
         # Try to match only Title field
-        hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'])
-        nodeset = [hit['_source'] for hit in hits]
+        hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'], limit=n)
+        if return_scores:
+            nodeset = [{**hit['_source'], 'Score': hit['score']} for hit in hits]
+        else:
+            nodeset = [hit['_source'] for hit in hits]
+
+        if len(nodeset) > 0:
+            return nodeset
 
         # Fallback try to match Content field instead
-        if not nodeset:
-            query['function_score']['query']['bool']['must'][0]['multi_match']['fields'] = ['Content']
-            hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'])
+        query['function_score']['query']['bool']['must'][0]['multi_match']['fields'] = ['Content']
+        hits = self._search(query, source=['NodeKey', 'NodeType', 'Title'], limit=n)
+        if return_scores:
+            nodeset = [{**hit['_source'], 'Score': hit['score']} for hit in hits]
+        else:
             nodeset = [hit['_source'] for hit in hits]
 
         return nodeset
