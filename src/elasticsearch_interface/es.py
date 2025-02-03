@@ -1,5 +1,7 @@
 from ssl import create_default_context
 
+from abc import ABC, abstractmethod
+
 from elasticsearch import Elasticsearch
 
 from elasticsearch_interface.utils import (
@@ -11,9 +13,9 @@ from elasticsearch_interface.utils import (
 )
 
 
-class ES:
+class ESIndexBuilder:
     """
-    Base class to communicate with elasticsearch in the context of the project EPFL Graph.
+    Class to create, build, and destroy indexes
     """
 
     def __init__(self, config, index):
@@ -33,12 +35,101 @@ class ES:
 
         self.index = index
 
-    ################################################################
+    def indices(self):
+        """
+        Retrieve information about all elasticsearch indices.
 
-    def _search(self, query, limit=10, source=None, explain=False, rescore=None):
-        search = self.client.search(index=self.index, query=query, source=source, rescore=rescore, size=limit, explain=explain, profile=True)
+        Returns:
+            dict: elasticsearch response
+        """
+
+        return self.client.cat.indices(index=self.index, format='json', v=True)
+
+    def refresh(self):
+        """
+        Refresh index.
+
+        Returns:
+            dict: elasticsearch response
+        """
+
+        self.client.indices.refresh(index=self.index)
+
+    def index_doc(self, doc):
+        """
+        Index the given document.
+
+        Args:
+            doc (dict): Document to index.
+
+        Returns:
+            dict: elasticsearch response
+        """
+
+        if 'id' in doc:
+            self.client.index(index=self.index, document=doc, id=doc['id'])
+        else:
+            self.client.index(index=self.index, document=doc)
+
+    def create_index(self, settings=None, mapping=None):
+        """
+        Create index with the given settings and mapping.
+
+        Args:
+            settings (dict): Dictionary with elasticsearch settings, in that format.
+            mapping (dict): Dictionary with elasticsearch mapping, in that format.
+
+        Returns:
+            dict: elasticsearch response
+        """
+
+        body = {}
+
+        if settings is not None:
+            body['settings'] = settings
+
+        if mapping is not None:
+            body['mappings'] = mapping
+
+        if body:
+            self.client.indices.create(index=self.index, body=body)
+        else:
+            self.client.indices.create(index=self.index)
+
+    def delete_index(self):
+        """
+        Delete index.
+
+        Returns:
+            dict: elasticsearch response
+        """
+
+        self.client.indices.delete(index=self.index, ignore_unavailable=True)
+
+    def recreate_index(self, settings=None, mapping=None):
+        self.delete_index()
+        self.create_index(settings=settings, mapping=mapping)
+
+
+class AbstractESRetriever(ABC, ESIndexBuilder):
+    """
+    Abstract base class to communicate with elasticsearch in the context of the project EPFL Graph.
+    """
+
+    def _search(self, query, knn=None, rank=None, limit=10, source=None, explain=False, rescore=None):
+        search = self.client.search(index=self.index, query=query, knn=knn, rank=rank, source=source, rescore=rescore, size=limit, explain=explain, profile=True)
 
         return search['hits']['hits']
+
+    @abstractmethod
+    def search(self, text, limit=10):
+        pass
+
+
+class ESConceptDetection(AbstractESRetriever):
+    """
+    Elasticsearch connector for concept detection
+    """
 
     def _search_mediawiki(self, text, limit=10):
         """
@@ -78,124 +169,6 @@ class ES:
                             multi_match_query(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1),
                             multi_match_query(fields=['opening_text^3', 'opening_text.plain^1'], text=text, type='most_fields', boost=0.5, minimum_should_match=1)
                         ]),
-                    ]
-                )
-            ]
-        )
-
-        return self._search(query, limit=limit)
-
-    def _search_mediawiki_no_plain(self, text, limit=10):
-        """
-        Perform elasticsearch search query using the mediawiki query structure, restricted to non-plain fields.
-
-        Args:
-            text (str): Query text for the search.
-            limit (int): Maximum number of returned results.
-
-        Returns:
-            list: A list of the documents that are hits for the search.
-        """
-
-        query = bool_query(
-            should=[
-                match_query(field='all_near_match', text=text, boost=10),
-                bool_query(
-                    filter=[
-                        match_query('all', text=text, operator='and')
-                    ],
-                    should=[
-                        match_query(field='title', text=text, boost=0.9),
-                        match_query(field='category', text=text, boost=0.15),
-                        match_query(field='heading', text=text, boost=0.15),
-                        match_query(field='auxiliary_text', text=text, boost=0.15),
-                        match_query(field='file_text', text=text, boost=1.5),
-                        dis_max_query([
-                            match_query(field='redirect', text=text, boost=0.81),
-                            match_query(field='suggest', text=text, boost=0.2)
-                        ]),
-                        dis_max_query([
-                            match_query(field='text', text=text, boost=1.8),
-                            match_query(field='opening_text', text=text, boost=1.5)
-                        ])
-                    ]
-                )
-            ]
-        )
-
-        return self._search(query, limit=limit)
-
-    def _search_mediawiki_restrict_4(self, text, limit=10):
-        """
-        Perform elasticsearch search query using the mediawiki query structure, restricted to the following fields:
-        title, text, heading, opening_text
-
-        Args:
-            text (str): Query text for the search.
-            limit (int): Maximum number of returned results.
-
-        Returns:
-            list: A list of the documents that are hits for the search.
-        """
-
-        query = bool_query(
-            should=[
-                bool_query(
-                    filter=[
-                        bool_query(
-                            should=[
-                                match_query('title', text=text, operator='and'),
-                                match_query('title.plain', text=text, operator='and'),
-                                match_query('text', text=text, operator='and'),
-                                match_query('text.plain', text=text, operator='and'),
-                                match_query('heading', text=text, operator='and'),
-                                match_query('heading.plain', text=text, operator='and')
-                            ]
-                        )
-                    ],
-                    should=[
-                        multi_match_query(fields=['title^3', 'title.plain^1'], text=text, type='most_fields', boost=0.3, minimum_should_match=1),
-                        multi_match_query(fields=['heading^3', 'heading.plain^1'], text=text, type='most_fields', boost=0.05, minimum_should_match=1),
-                        dis_max_query([
-                            multi_match_query(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1),
-                            multi_match_query(fields=['opening_text^3', 'opening_text.plain^1'], text=text, type='most_fields', boost=0.5, minimum_should_match=1)
-                        ])
-                    ]
-                )
-            ]
-        )
-
-        return self._search(query, limit=limit)
-
-    def _search_mediawiki_restrict_2(self, text, limit=10):
-        """
-        Perform elasticsearch search query using the mediawiki query structure, restricted to the following fields:
-        title, text
-
-        Args:
-            text (str): Query text for the search.
-            limit (int): Maximum number of returned results.
-
-        Returns:
-            list: A list of the documents that are hits for the search.
-        """
-
-        query = bool_query(
-            should=[
-                bool_query(
-                    filter=[
-                        bool_query(
-                            should=[
-                                match_query('title', text=text, operator='and'),
-                                match_query('title.plain', text=text, operator='and'),
-                                match_query('text', text=text, operator='and'),
-                                match_query('text.plain', text=text, operator='and')
-                            ]
-                        )
-                    ],
-                    should=[
-                        multi_match_query(fields=['title^3', 'title.plain^1'], text=text, type='most_fields', boost=0.3, minimum_should_match=1),
-                        multi_match_query(fields=['text^3', 'text.plain^1'], text=text, type='most_fields', boost=0.6, minimum_should_match=1)
                     ]
                 )
             ]
@@ -341,75 +314,160 @@ class ES:
 
         return nodeset
 
-    ################################################################
 
-    def indices(self):
-        """
-        Retrieve information about all elasticsearch indices.
+class ESGraphSearch(AbstractESRetriever):
+    def _search_graphsearch(self, texts, node_type, limit, return_links):
+        def build_fields(lang):
+            return [
+                f"name.{lang}",
+                f"name.{lang}.keyword",
+                f"name.{lang}.raw",
+                f"name.{lang}.trigram",
+                f"name.{lang}.sayt._2gram",
+                f"name.{lang}.sayt._3gram",
+                f"short_description.{lang}",
+                f"long_description.{lang}^0.001"
+            ]
 
-        Returns:
-            dict: elasticsearch response
-        """
+        en_clauses = []
+        fr_clauses = []
+        id_clauses = []
+        for text in texts:
+            en_clauses.append({
+                "multi_match": {
+                    "fields": build_fields('en'),
+                    "query": text
+                }
+            })
 
-        return self.client.cat.indices(index=self.index, format='json', v=True)
+            fr_clauses.append({
+                "multi_match": {
+                    "fields": build_fields('fr'),
+                    "query": text
+                }
+            })
 
-    def refresh(self):
-        """
-        Refresh index.
+            id_clauses.append({
+                "term": {
+                    "doc_id.keyword": {
+                        "boost": 10,
+                        "value": text
+                    }
+                }
+            })
 
-        Returns:
-            dict: elasticsearch response
-        """
+        # en_query is an OR between matches against en fields for all texts
+        en_query = {
+            "bool": {
+                "should": en_clauses,
+                "minimum_should_match": 1
+            }
+        }
 
-        self.client.indices.refresh(index=self.index)
+        # fr_query is an OR between matches against fr fields for all texts
+        fr_query = {
+            "bool": {
+                "should": fr_clauses,
+                "minimum_should_match": 1
+            }
+        }
 
-    def index_doc(self, doc):
-        """
-        Index the given document.
+        # We then take the maximum between the two (otherwise words spelled the same in both languages would be boosted)
+        max_en_fr_query = {
+            "dis_max": {
+                "queries": [en_query, fr_query]
+            }
+        }
 
-        Args:
-            doc (dict): Document to index.
+        ################################################################
+        # Build filter clause                                          #
+        ################################################################
 
-        Returns:
-            dict: elasticsearch response
-        """
+        # We use only documents from EPFL or the ontology
+        filter_clause = [
+            {
+                "terms": {"doc_institution.keyword": ["EPFL", "Ont"]}
+            },
+            # {
+            #     "terms": {"links.link_institution.keyword": ["EPFL", "Ont"]}
+            # }
+        ]
 
-        if 'id' in doc:
-            self.client.index(index=self.index, document=doc, id=doc['id'])
+        # And if node_types are specified, we keep only those documents
+        if isinstance(node_type, list):
+            filter_clause.append(
+                {
+                    "terms": {"doc_type.keyword": node_type}
+                }
+            )
+
+        elif isinstance(node_type, str):
+            filter_clause.append(
+                {
+                    "term": {"doc_type.keyword": node_type}
+                }
+            )
+
+        ################################################################
+        # Build final query                                            #
+        ################################################################
+
+        # The final query does the following
+        #   1. Keeps only documents satisfying the filter
+        #   2. Looks at text matches in en and fr, and also exact matches against the id field.
+        #   3. Updates match score multiplying by degree score
+        query = {
+            "function_score": {
+                "score_mode": "multiply",
+                "functions": [{"field_value_factor": {"field": "degree_score"}}],
+                "query": {
+                    "bool": {
+                        "filter": filter_clause,
+                        "should": id_clauses + [max_en_fr_query],
+                        "minimum_should_match": 1
+                    }
+                }
+            }
+        }
+
+        ################################################################
+        # Build fields                                                 #
+        ################################################################
+
+        node_fields = ["doc_type", "doc_id", "name", "short_description"]
+
+        link_fields = ["link_type", "link_id", "link_name", "link_rank", "link_short_description"]
+
+        type_specific_fields = {
+            'course': ["latest_academic_year"],
+            'lecture': ["video_duration"],
+            'mooc': ["level", "domain", "language", "platform"],
+            'person': ["gender", "is_at_epfl"],
+            'publication': ["year", "publisher", "published_in"],
+            'unit': ["is_research_unit", "is_active_unit"],
+            'category': ["depth"],
+            'concept': [],
+            'startup': []
+        }
+
+        fields = node_fields + [type_field for _, type_fields in type_specific_fields.items() for type_field in
+                                type_fields]
+
+        if return_links:
+            fields += ['links']
+            fields += [f"links.{link_field}" for link_field in link_fields]
+            fields += [f"links.{type_field}" for _, type_fields in type_specific_fields.items() for type_field in
+                       type_fields]
+
+        return self._search(query=query, source=fields, limit=limit)
+
+    def search(self, texts, node_type=None, limit=10, return_links=False, return_scores=False):
+        # Make texts always a list
+        if isinstance(texts, str):
+            texts = [texts]
+        hits = self._search_graphsearch(texts, node_type, limit, return_links)
+        if return_scores:
+            hits = [{**hit['_source'], 'score': hit['_score']} for hit in hits]
         else:
-            self.client.index(index=self.index, document=doc)
-
-    def create_index(self, settings=None, mapping=None):
-        """
-        Create index with the given settings and mapping.
-
-        Args:
-            settings (dict): Dictionary with elasticsearch settings, in that format.
-            mapping (dict): Dictionary with elasticsearch mapping, in that format.
-
-        Returns:
-            dict: elasticsearch response
-        """
-
-        body = {}
-
-        if settings is not None:
-            body['settings'] = settings
-
-        if mapping is not None:
-            body['mappings'] = mapping
-
-        if body:
-            self.client.indices.create(index=self.index, body=body)
-        else:
-            self.client.indices.create(index=self.index)
-
-    def delete_index(self):
-        """
-        Delete index.
-
-        Returns:
-            dict: elasticsearch response
-        """
-
-        self.client.indices.delete(index=self.index, ignore_unavailable=True)
+            hits = [hit['_source'] for hit in hits]
+        return hits
