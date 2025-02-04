@@ -10,6 +10,7 @@ from elasticsearch_interface.utils import (
     term_query,
     multi_match_query,
     dis_max_query,
+    term_based_filter,
     SCORE_FUNCTIONS,
 )
 
@@ -330,39 +331,6 @@ class ESGraphSearch(AbstractESRetriever):
                 f"long_description.{lang}^0.001"
             ]
 
-        ################################################################
-        # Build filter clause                                          #
-        ################################################################
-
-        # We use only documents from EPFL or the ontology
-        filter_clause = [
-            {
-                "terms": {"doc_institution.keyword": ["EPFL", "Ont"]}
-            },
-            # {
-            #     "terms": {"links.link_institution.keyword": ["EPFL", "Ont"]}
-            # }
-        ]
-
-        # And if node_types are specified, we keep only those documents
-        if isinstance(node_type, list):
-            filter_clause.append(
-                {
-                    "terms": {"doc_type.keyword": node_type}
-                }
-            )
-
-        elif isinstance(node_type, str):
-            filter_clause.append(
-                {
-                    "term": {"doc_type.keyword": node_type}
-                }
-            )
-
-        ################################################################
-        # Build final query                                            #
-        ################################################################
-
         # The final query does the following
         #   1. Keeps only documents satisfying the filter
         #   2. Looks at text matches in en and fr, and also exact matches against the id field.
@@ -386,7 +354,10 @@ class ESGraphSearch(AbstractESRetriever):
                             )
                         ])
                     ],
-                    filter=filter_clause,
+                    filter=term_based_filter({
+                        "doc_institution.keyword": ["EPFL", "Ont"],
+                        "doc_type.keyword": node_type
+                    }),
                     minimum_should_match=1
                 )
             }
