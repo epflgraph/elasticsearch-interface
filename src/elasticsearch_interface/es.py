@@ -7,6 +7,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch_interface.utils import (
     bool_query,
     match_query,
+    term_query,
     multi_match_query,
     dis_max_query,
     SCORE_FUNCTIONS,
@@ -329,56 +330,6 @@ class ESGraphSearch(AbstractESRetriever):
                 f"long_description.{lang}^0.001"
             ]
 
-        en_clauses = []
-        fr_clauses = []
-        id_clauses = []
-        for text in texts:
-            en_clauses.append({
-                "multi_match": {
-                    "fields": build_fields('en'),
-                    "query": text
-                }
-            })
-
-            fr_clauses.append({
-                "multi_match": {
-                    "fields": build_fields('fr'),
-                    "query": text
-                }
-            })
-
-            id_clauses.append({
-                "term": {
-                    "doc_id.keyword": {
-                        "boost": 10,
-                        "value": text
-                    }
-                }
-            })
-
-        # en_query is an OR between matches against en fields for all texts
-        en_query = {
-            "bool": {
-                "should": en_clauses,
-                "minimum_should_match": 1
-            }
-        }
-
-        # fr_query is an OR between matches against fr fields for all texts
-        fr_query = {
-            "bool": {
-                "should": fr_clauses,
-                "minimum_should_match": 1
-            }
-        }
-
-        # We then take the maximum between the two (otherwise words spelled the same in both languages would be boosted)
-        max_en_fr_query = {
-            "dis_max": {
-                "queries": [en_query, fr_query]
-            }
-        }
-
         ################################################################
         # Build filter clause                                          #
         ################################################################
@@ -420,13 +371,24 @@ class ESGraphSearch(AbstractESRetriever):
             "function_score": {
                 "score_mode": "multiply",
                 "functions": [{"field_value_factor": {"field": "degree_score"}}],
-                "query": {
-                    "bool": {
-                        "filter": filter_clause,
-                        "should": id_clauses + [max_en_fr_query],
-                        "minimum_should_match": 1
-                    }
-                }
+                "query": bool_query(
+                    should=[
+                        term_query("doc_id.keyword", text, boost=10) for text in texts
+                    ] + [
+                        dis_max_query([
+                            bool_query(
+                                should=[multi_match_query(build_fields('en'), text) for text in texts],
+                                minimum_should_match=1
+                            ),
+                            bool_query(
+                                should=[multi_match_query(build_fields('fr'), text) for text in texts],
+                                minimum_should_match=1
+                            )
+                        ])
+                    ],
+                    filter=filter_clause,
+                    minimum_should_match=1
+                )
             }
         }
 
