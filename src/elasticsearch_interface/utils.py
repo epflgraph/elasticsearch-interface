@@ -122,6 +122,22 @@ def dis_max_query(queries):
     return query
 
 
+def term_based_filter(term_to_values_dict):
+    results = list()
+    for term, value in term_to_values_dict.items():
+        if value is None:
+            continue
+        if isinstance(value, list):
+            results.append({
+                "terms": {term: value}
+            })
+        elif isinstance(value, str):
+            results.append({
+                "term": {term: value}
+            })
+    return results
+
+
 SCORE_FUNCTIONS = [
     {
         "field_value_factor": {"field": "DegreeScore"}
