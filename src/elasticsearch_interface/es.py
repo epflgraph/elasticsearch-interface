@@ -2,7 +2,7 @@ from ssl import create_default_context
 
 from abc import ABC, abstractmethod
 
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers
 
 from elasticsearch_interface.utils import (
     bool_query,
@@ -65,13 +65,35 @@ class ESIndexBuilder:
             doc (dict): Document to index.
 
         Returns:
-            dict: elasticsearch response
+            None
         """
 
         if 'id' in doc:
             self.client.index(index=self.index, document=doc, id=doc['id'])
         else:
             self.client.index(index=self.index, document=doc)
+
+    def bulk_index_docs(self, docs, chunk_size=500):
+        """
+        Index a list of documents.
+
+        Args:
+            docs (dict): Documents to index.
+            chunk_size: Chunk size for bulk operation (used by helpers.streaming_bulk, which is called by helpers.bulk)
+        Returns:
+            None
+        """
+        def yield_docs():
+            for current_doc in docs:
+                current_op = {
+                    '_index': self.index,
+                    '_op_type': 'index',
+                    '_source': current_doc
+                }
+                if 'id' in current_doc:
+                    current_op['_id'] = current_doc['id']
+                yield current_op
+        helpers.bulk(self.client, actions=yield_docs(), chunk_size=chunk_size)
 
     def create_index(self, settings=None, mapping=None):
         """
