@@ -4,9 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "elasticsearch-interface"
-version = "0.5.0"
+version = "0.6.0"
 authors = [
-  { name="Aitor Pérez", email="aitor.perez@epfl.ch" }
+  { name="Aitor Pérez", email="aitor.perez@epfl.ch" },
+  { name="Ramtin Yazdanian", email="ramtin.yazdanian@epfl.ch" }
 ]
 description = "Interface to interact with elasticsearch's python client for the use case of EPFL Graph"
 readme = "README.md"

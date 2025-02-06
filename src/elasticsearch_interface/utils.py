@@ -1,4 +1,4 @@
-def bool_query(must=None, must_not=None, should=None, filter=None):
+def bool_query(must=None, must_not=None, should=None, filter=None, minimum_should_match=None):
     """
     Build elasticsearch bool clause with given arguments.
 
@@ -21,6 +21,9 @@ def bool_query(must=None, must_not=None, should=None, filter=None):
 
     if filter is not None:
         query['bool']['filter'] = filter
+
+    if minimum_should_match is not None:
+        query['bool']['minimum_should_match'] = minimum_should_match
 
     return query
 
@@ -46,6 +49,28 @@ def match_query(field, text, boost=None, operator=None):
 
     if operator is not None:
         query['match'][field]['operator'] = operator
+
+    return query
+
+
+def term_query(term, text, boost=None):
+    """
+    Build elasticsearch term clause with given arguments.
+
+    Returns:
+        dict
+    """
+
+    query = {
+        'term': {
+            term: {
+                'value': text
+            }
+        }
+    }
+
+    if boost is not None:
+        query['term'][term]['boost'] = boost
 
     return query
 
@@ -95,6 +120,22 @@ def dis_max_query(queries):
     }
 
     return query
+
+
+def term_based_filter(term_to_values_dict):
+    results = list()
+    for term, value in term_to_values_dict.items():
+        if value is None:
+            continue
+        if isinstance(value, list):
+            results.append({
+                "terms": {term: value}
+            })
+        elif isinstance(value, str):
+            results.append({
+                "term": {term: value}
+            })
+    return results
 
 
 SCORE_FUNCTIONS = [
