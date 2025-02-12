@@ -302,3 +302,61 @@ class ESGraphSearch(AbstractESRetriever):
         else:
             hits = [hit['_source'] for hit in hits]
         return hits
+
+
+class ESLex(AbstractESRetriever):
+    def _search_lex(self, text, embedding, limit, lang_filter):
+        def build_fields(lang):
+            return [
+                f"content.{lang}",
+                f"content.{lang}.keyword",
+                f"content.{lang}.raw",
+                f"content.{lang}.trigram",
+                f"content.{lang}.sayt._2gram",
+                f"content.{lang}.sayt._3gram"
+            ]
+
+        # The final query does the following
+        #   1. Keeps only documents satisfying the language filter.
+        #   2. Looks at text matches in en and fr.
+        #   3. Looks at embedding-based matches.
+        if lang_filter is not None:
+            filter_clause = term_based_filter({
+                "language.keyword": lang_filter
+            })
+        else:
+            filter_clause = None
+        query = bool_query(
+            should=[
+                dis_max_query([
+                    bool_query(
+                        should=multi_match_query(build_fields('en'), text),
+                        minimum_should_match=1
+                    ),
+                    bool_query(
+                        should=multi_match_query(build_fields('fr'), text),
+                        minimum_should_match=1
+                    )
+                ])
+            ],
+            filter=filter_clause,
+            minimum_should_match=1
+        )
+        if embedding is not None:
+            knn = {
+                "field": "embedding",
+                "query_vector": embedding,
+                "k": 10
+            }
+        else:
+            knn = None
+
+        return self._search(query=query, knn=knn, limit=limit)
+
+    def search(self, text, embedding=None, lang=None, limit=10, return_scores=False):
+        hits = self._search_lex(text, embedding, limit, lang)
+        if return_scores:
+            hits = [{**hit['_source'], 'score': hit['_score']} for hit in hits]
+        else:
+            hits = [hit['_source'] for hit in hits]
+        return hits
