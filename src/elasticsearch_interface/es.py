@@ -353,10 +353,12 @@ class ESLex(AbstractESRetriever):
 
         return self._search(query=query, knn=knn, limit=limit)
 
-    def search(self, text, embedding=None, lang=None, limit=10, return_scores=False):
+    def search(self, text, embedding=None, lang=None, limit=10, return_scores=False, return_embeddings=False):
         hits = self._search_lex(text, embedding, limit, lang)
         if return_scores:
             hits = [{**hit['_source'], 'score': hit['_score']} for hit in hits]
         else:
             hits = [hit['_source'] for hit in hits]
+        if not return_embeddings:
+            hits = [{k: v for k, v in hit.items() if k != 'embedding'} for hit in hits]
         return hits
