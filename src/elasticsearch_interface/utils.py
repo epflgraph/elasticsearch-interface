@@ -167,3 +167,17 @@ SCORE_FUNCTIONS = [
         "weight": 1
     }
 ]
+
+
+def include_or_exclude_scores(hits, return_scores=False):
+    if return_scores:
+        hits = [{**hit['_source'], 'score': hit['_score']} for hit in hits]
+    else:
+        hits = [hit['_source'] for hit in hits]
+    return hits
+
+
+def include_or_exclude_embeddings(hits, return_embeddings=False):
+    if not return_embeddings:
+        hits = [{k: v for k, v in hit.items() if k != 'embedding'} for hit in hits]
+    return hits
