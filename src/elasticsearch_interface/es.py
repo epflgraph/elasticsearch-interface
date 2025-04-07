@@ -46,7 +46,7 @@ class ESIndexBuilder:
             dict: elasticsearch response
         """
 
-        return self.client.cat.indices(index=self.index, format='json', v=True)
+        return self.client.indices.stats()['indices']
 
     def refresh(self):
         """
