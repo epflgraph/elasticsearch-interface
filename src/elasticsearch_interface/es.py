@@ -13,13 +13,12 @@ from elasticsearch_interface.utils import (
     term_based_filter,
     include_or_exclude_scores,
     include_or_exclude_embeddings,
-    SCORE_FUNCTIONS,
 )
 
 
 class ESIndexBuilder:
     """
-    Class to create, build, and destroy indexes
+    Class to create, build, and destroy indexes, and add/remove aliases
     """
 
     def __init__(self, config, index):
@@ -133,8 +132,50 @@ class ESIndexBuilder:
         self.client.indices.delete(index=self.index, ignore_unavailable=True)
 
     def recreate_index(self, settings=None, mapping=None):
+        """
+        Recreates the current index
+        Args:
+            settings: The settings dictionary
+            mapping: The index mappings
+
+        Returns:
+            None
+        """
         self.delete_index()
         self.create_index(settings=settings, mapping=mapping)
+
+    def add_alias(self, alias):
+        """
+        Adds an alias to the current index.
+        Args:
+            alias: The alias to add
+
+        Returns:
+            None
+        """
+        self.client.indices.put_alias(index=self.index, name=alias)
+
+    def remove_alias(self, alias):
+        """
+        Removes an alias from the current index.
+        Args:
+            alias: The alias to remove
+
+        Returns:
+            None
+        """
+        self.client.indices.delete_alias(index=self.index, name=alias)
+
+    def eliminate_alias(self, alias):
+        """
+        Completely removes an alias from any and all indexes. USE WITH CAUTION!
+        Args:
+            alias: The alias to remove
+
+        Returns:
+            None
+        """
+        self.client.indices.delete_alias(index='*', name=alias)
 
 
 class AbstractESRetriever(ABC, ESIndexBuilder):
