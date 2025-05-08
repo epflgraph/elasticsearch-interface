@@ -386,7 +386,8 @@ class ESLex(AbstractESRetriever):
             knn = {
                 "field": "embedding",
                 "query_vector": embedding,
-                "k": 10
+                "k": 10,
+                "filter": filter_clause
             }
         else:
             knn = None
@@ -447,7 +448,8 @@ class ESServiceDesk(AbstractESRetriever):
             knn = {
                 "field": "embedding",
                 "query_vector": embedding,
-                "k": 10
+                "k": 10,
+                "filter": filter_clause
             }
         else:
             knn = None
@@ -505,7 +507,8 @@ class ESGeneralRAG(AbstractESRetriever):
             knn = {
                 "field": "embedding",
                 "query_vector": embedding,
-                "k": 10
+                "k": 10,
+                "filter": filter_clause
             }
         else:
             knn = None
