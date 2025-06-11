@@ -259,7 +259,11 @@ class ESConceptDetection(AbstractESRetriever):
 
 
 class ESGraphSearch(AbstractESRetriever):
-    def _search_graphsearch(self, texts, node_type, limit, return_links):
+    def _build_query(self, texts, node_type):
+        ################################################################
+        # Build text match clauses                                     #
+        ################################################################
+
         def build_fields(lang):
             return [
                 f"name.{lang}",
@@ -272,6 +276,90 @@ class ESGraphSearch(AbstractESRetriever):
                 f"long_description.{lang}^0.001"
             ]
 
+        en_clauses = []
+        fr_clauses = []
+        id_clauses = []
+        for text in texts:
+            en_clauses.append({
+                "multi_match": {
+                    "fields": build_fields('en'),
+                    "query": text
+                }
+            })
+
+            fr_clauses.append({
+                "multi_match": {
+                    "fields": build_fields('fr'),
+                    "query": text
+                }
+            })
+
+            id_clauses.append({
+                "term": {
+                    "doc_id.keyword": {
+                        "boost": 10,
+                        "value": text
+                    }
+                }
+            })
+
+        # en_query is an OR between matches against en fields for all texts
+        en_query = {
+            "bool": {
+                "should": en_clauses,
+                "minimum_should_match": 1
+            }
+        }
+
+        # fr_query is an OR between matches against fr fields for all texts
+        fr_query = {
+            "bool": {
+                "should": fr_clauses,
+                "minimum_should_match": 1
+            }
+        }
+
+        # We then take the maximum between the two (otherwise words spelled the same in both languages would be boosted)
+        max_en_fr_query = {
+            "dis_max": {
+                "queries": [en_query, fr_query]
+            }
+        }
+
+        ################################################################
+        # Build filter clause                                          #
+        ################################################################
+
+        # # We use only documents from EPFL or the ontology - WAS REMOVED FROM THE INDEX
+        # filter_clause = [
+        #     {
+        #         "terms": {"doc_institution.keyword": ["EPFL", "Ont"]}
+        #     },
+        #     # {
+        #     #     "terms": {"links.link_institution.keyword": ["EPFL", "Ont"]}
+        #     # }
+        # ]
+        filter_clause = []
+
+        # And if node_types are specified, we keep only those documents
+        if isinstance(node_type, list):
+            filter_clause.append(
+                {
+                    "terms": {"doc_type.keyword": node_type}
+                }
+            )
+
+        elif isinstance(node_type, str):
+            filter_clause.append(
+                {
+                    "term": {"doc_type.keyword": node_type}
+                }
+            )
+
+        ################################################################
+        # Build final query                                            #
+        ################################################################
+
         # The final query does the following
         #   1. Keeps only documents satisfying the filter
         #   2. Looks at text matches in en and fr, and also exact matches against the id field.
@@ -280,30 +368,19 @@ class ESGraphSearch(AbstractESRetriever):
             "function_score": {
                 "score_mode": "multiply",
                 "functions": [{"field_value_factor": {"field": "degree_score"}}],
-                "query": bool_query(
-                    should=[
-                        term_query("doc_id.keyword", text, boost=10) for text in texts
-                    ] + [
-                        dis_max_query([
-                            bool_query(
-                                should=[multi_match_query(build_fields('en'), text) for text in texts],
-                                minimum_should_match=1
-                            ),
-                            bool_query(
-                                should=[multi_match_query(build_fields('fr'), text) for text in texts],
-                                minimum_should_match=1
-                            )
-                        ])
-                    ],
-                    filter=term_based_filter({
-                        "doc_institution.keyword": ["EPFL", "Ont"],
-                        "doc_type.keyword": node_type
-                    }),
-                    minimum_should_match=1
-                )
+                "query": {
+                    "bool": {
+                        "filter": filter_clause,
+                        "should": id_clauses + [max_en_fr_query],
+                        "minimum_should_match": 1
+                    }
+                }
             }
         }
 
+        return query
+
+    def _build_fields(self, return_links):
         ################################################################
         # Build fields                                                 #
         ################################################################
@@ -324,22 +401,28 @@ class ESGraphSearch(AbstractESRetriever):
             'startup': []
         }
 
-        fields = node_fields + [type_field for _, type_fields in type_specific_fields.items() for type_field in
-                                type_fields]
+        fields = node_fields + [type_field for _, type_fields in type_specific_fields.items() for type_field in type_fields]
 
         if return_links:
             fields += ['links']
             fields += [f"links.{link_field}" for link_field in link_fields]
-            fields += [f"links.{type_field}" for _, type_fields in type_specific_fields.items() for type_field in
-                       type_fields]
+            fields += [f"links.{type_field}" for _, type_fields in type_specific_fields.items() for type_field in type_fields]
 
-        return self._search(query=query, source=fields, limit=limit)
+        return fields
 
-    def search(self, texts, node_type=None, limit=10, return_links=False, return_scores=False):
+    def _search_graphsearch(self, texts, node_type, limit, return_links):
         # Make texts always a list
         if isinstance(texts, str):
             texts = [texts]
-        hits = self._search_graphsearch(texts, node_type, limit, return_links)
+
+        query = self._build_query(texts, node_type)
+        fields = self._build_fields(return_links)
+
+        return self._search(query=query, source=fields, limit=limit)
+
+    def search(self, text, node_type=None, limit=10, return_links=False, return_scores=False):
+        # Run search
+        hits = self._search_graphsearch(text, node_type, limit, return_links)
         hits = include_or_exclude_scores(hits, return_scores)
         return hits
 
@@ -523,3 +606,19 @@ class ESGeneralRAG(AbstractESRetriever):
         hits = include_or_exclude_scores(hits, return_scores)
         hits = include_or_exclude_embeddings(hits, return_embeddings)
         return hits
+
+
+if __name__ == '__main__':
+    config = {
+        'host': 'localhost',
+        'port': 19200,
+        'username': '...',
+        'password': '...',
+        'cafile': '...',
+        'index': 'graphsearch_prod',
+    }
+
+    es = ESGraphSearch(config, index=config['index'])
+    results = es.search(['learning', 'education'], node_type=None, limit=3, return_links=True, return_scores=False)
+
+    print(results)
