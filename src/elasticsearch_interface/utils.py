@@ -53,6 +53,13 @@ def match_query(field, text, boost=None, operator=None):
     return query
 
 
+def match_all_query():
+    query = {
+        'match_all': {}
+    }
+    return query
+
+
 def term_query(term, text, boost=None):
     """
     Build elasticsearch term clause with given arguments.

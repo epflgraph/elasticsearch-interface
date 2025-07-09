@@ -7,7 +7,7 @@ from elasticsearch import Elasticsearch, helpers
 from elasticsearch_interface.utils import (
     bool_query,
     match_query,
-    term_query,
+    match_all_query,
     multi_match_query,
     dis_max_query,
     term_based_filter,
@@ -572,22 +572,33 @@ class ESGeneralRAG(AbstractESRetriever):
             })
         else:
             filter_clause = None
-        query = bool_query(
-            should=[
-                dis_max_query([
-                    bool_query(
-                        should=multi_match_query(build_fields('en'), text),
-                        minimum_should_match=1
-                    ),
-                    bool_query(
-                        should=multi_match_query(build_fields('fr'), text),
-                        minimum_should_match=1
-                    )
-                ])
-            ],
-            filter=filter_clause,
-            minimum_should_match=1
-        )
+        if len(text.strip()) > 0:
+            # If there is some text, then we add the text to the query
+            query = bool_query(
+                should=[
+                    dis_max_query([
+                        bool_query(
+                            should=multi_match_query(build_fields('en'), text),
+                            minimum_should_match=1
+                        ),
+                        bool_query(
+                            should=multi_match_query(build_fields('fr'), text),
+                            minimum_should_match=1
+                        )
+                    ])
+                ],
+                filter=filter_clause,
+                minimum_should_match=1
+            )
+        else:
+            # If there is no text, we use a match_all query and only do filters
+            query = bool_query(
+                should=[
+                    match_all_query()
+                ],
+                filter=filter_clause,
+                minimum_should_match=1
+            )
         if embedding is not None:
             knn = {
                 "field": "embedding",
