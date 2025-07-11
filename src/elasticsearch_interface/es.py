@@ -13,6 +13,7 @@ from elasticsearch_interface.utils import (
     term_based_filter,
     include_or_exclude_scores,
     include_or_exclude_embeddings,
+    date_based_filter
 )
 
 
@@ -566,10 +567,22 @@ class ESGeneralRAG(AbstractESRetriever):
         #   2. Looks at text matches in en and fr.
         #   3. Looks at embedding-based matches.
         if kwargs:
+            # The way we tell keyword filters apart from date filters is through the name
+            # Names of date filters must end in '_date'
             filter_clause = term_based_filter({
                 f"{arg}.keyword": val
                 for arg, val in kwargs.items()
+                if not arg.endswith('_date')
             })
+            filter_clause.extend(
+                date_based_filter(
+                    {
+                        arg[:-5]: val
+                        for arg, val in kwargs.items()
+                        if arg.endswith('_date')
+                    }
+                )
+            )
         else:
             filter_clause = None
         if len(text.strip()) > 0:

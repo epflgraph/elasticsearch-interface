@@ -145,6 +145,20 @@ def term_based_filter(term_to_values_dict):
     return results
 
 
+def date_based_filter(term_to_values_dict):
+    results = list()
+    for term, value in term_to_values_dict.items():
+        if value is None or not isinstance(value, dict):
+            continue
+        value = {k: v for k, v in value.items() if k in ['gte', 'lte']}
+        results.append({
+            "range": {
+                term: value
+            }
+        })
+    return results
+
+
 SCORE_FUNCTIONS = [
     {
         "field_value_factor": {"field": "DegreeScore"}
