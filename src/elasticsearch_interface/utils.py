@@ -145,17 +145,20 @@ def term_based_filter(term_to_values_dict):
     return results
 
 
-def date_based_filter(term_to_values_dict):
+def date_based_filter(term_to_values_dict, null_as_open=True):
     results = list()
     for term, value in term_to_values_dict.items():
         if value is None or not isinstance(value, dict):
             continue
         value = {k: v for k, v in value.items() if k in ['gte', 'lte']}
-        results.append({
-            "range": {
-                term: value
-            }
-        })
+        if null_as_open:
+            results.append(bool_query(should=[
+                {"range": {term: value}},
+                bool_query(must_not={"exists": {"field": term}})
+            ], minimum_should_match=1
+            ))
+        else:
+            results.append({"range": {term: value}})
     return results
 
 
