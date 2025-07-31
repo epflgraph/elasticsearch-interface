@@ -569,11 +569,19 @@ class ESGeneralRAG(AbstractESRetriever):
         if kwargs:
             # The way we tell keyword filters apart from date filters is through the name
             # Names of date filters must end in '_date'
-            filter_clause = term_based_filter({
-                f"{arg}.keyword": val
-                for arg, val in kwargs.items()
-                if not arg.endswith('_date')
-            })
+            filter_clause = list()
+
+            def get_arg_based_on_val(arg, val):
+                if isinstance(val, str) or (isinstance(val, list) and len(val) > 0 and isinstance(val[0], str)):
+                    return f"{arg}.keyword"
+                return arg
+            filter_clause.extend(
+                term_based_filter({
+                    get_arg_based_on_val(arg, val): val
+                    for arg, val in kwargs.items()
+                    if not arg.endswith('_date')
+                })
+            )
             filter_clause.extend(
                 date_based_filter(
                     {
