@@ -138,7 +138,7 @@ def term_based_filter(term_to_values_dict):
             results.append({
                 "terms": {term: value}
             })
-        elif isinstance(value, str):
+        else:
             results.append({
                 "term": {term: value}
             })
