@@ -630,7 +630,7 @@ class ESGeneralRAG(AbstractESRetriever):
                 knn["filter"] = filter_clause
         else:
             knn = None
-
+        print(query)
         return self._search(query=query, knn=knn, limit=limit)
 
     def search(self, text, embedding=None, limit=10, return_scores=False, return_embeddings=False, **kwargs):

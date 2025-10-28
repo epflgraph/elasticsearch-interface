@@ -150,7 +150,7 @@ def date_based_filter(term_to_values_dict, null_as_open=True):
     for term, value in term_to_values_dict.items():
         if value is None or not isinstance(value, dict):
             continue
-        value = {k: v for k, v in value.items() if k in ['gte', 'lte']}
+        value = {k: v for k, v in value.items() if k in ['gte', 'lte', 'gt', 'lt']}
         if null_as_open:
             results.append(bool_query(should=[
                 {"range": {term: value}},
